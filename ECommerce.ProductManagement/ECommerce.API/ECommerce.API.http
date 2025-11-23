@@ -1,0 +1,43 @@
+# @ECommerce.API_HostAddress = http://localhost:5201
+
+@host = https://localhost:5001
+@contentType = application/json
+
+### Get all products
+GET {{host}}/api/v1/products
+Accept: {{contentType}}
+
+### Get product by ID
+GET {{host}}/api/v1/products/YOUR-GUID-HERE
+Accept: {{contentType}}
+
+### Create product
+POST {{host}}/api/v1/products
+Content-Type: {{contentType}}
+
+{
+  "sku": "TSHIRT-001",
+  "name": "Classic Cotton T-Shirt",
+  "description": "Comfortable cotton t-shirt",
+  "basePrice": 29.99,
+  "costPrice": 15.00,
+  "categoryId": "YOUR-CATEGORY-GUID",
+  "brandId": "YOUR-BRAND-GUID"
+}
+
+### Update product
+PUT {{host}}/api/v1/products/YOUR-GUID-HERE
+Content-Type: {{contentType}}
+
+{
+  "name": "Premium Cotton T-Shirt",
+  "description": "Updated description",
+  "basePrice": 34.99,
+  "costPrice": 18.00,
+  "categoryId": "YOUR-CATEGORY-GUID",
+  "isActive": true,
+  "rowVersion": []
+}
+
+### Delete product
+DELETE {{host}}/api/v1/products/YOUR-GUID-HERE

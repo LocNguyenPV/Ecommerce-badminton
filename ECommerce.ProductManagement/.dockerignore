@@ -1,0 +1,50 @@
+# .NET Core build artifacts
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Test results
+[Tt]est[Rr]esult*/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet packages
+# 'dotnet restore' sẽ tải chúng lại, không cần copy vào image
+**/[Pp]ackages/*
+*.nupkg
+*.snupkg
+
+# Misc
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+
+# Development-specific settings
+# Chỉ dùng appsettings.Production.json trong container
+appsettings.Development.json
+
+# OS
+.DS_Store
+Thumbs.db
