@@ -47,7 +47,7 @@ pipeline {
                     steps {
                         // Navigate into the frontend source code directory
                         // Assumes your frontend code and Dockerfile are in a 'frontend' folder
-                        dir('frontend') { 
+                        dir('ecommerce-badminton-fe') { 
                             echo "INFO: Building Frontend production image: ${env.FRONTEND_IMAGE}"
                             // Build the Docker image using the Dockerfile in the current directory (.)
                             // The image will be tagged with the name defined in FRONTEND_IMAGE
@@ -60,7 +60,7 @@ pipeline {
                     steps {
                         // Navigate into the backend source code directory
                         // Assumes your backend code and Dockerfile are in a 'CoreAPI' folder
-                        dir('CoreAPI') { 
+                        dir('ECommerce.ProductManagement') { 
                             echo "INFO: Building Backend image: ${env.BACKEND_IMAGE}"
                             sh "docker build -t ${env.BACKEND_IMAGE} ."
                         }
@@ -112,29 +112,29 @@ pipeline {
                 echo "(Replace <DOCKER_HOST_IP> with your host's actual IP, e.g., 192.168.110.161)"
             }
         } // End Stage 4
-        stage('5. Push image to hub'){
-            steps{
-                script{
-                     withCredentials([usernamePassword(
-                                credentialsId: env.REGISTRY_CREDENTIAL, 
-                                usernameVariable: 'REG_USER', 
-                                passwordVariable: 'REG_PASS')]
-                                ){
-                                sh '''
-                                    echo " Tagging frontend image: ${FRONTEND_IMAGE}"
-                                    docker tag ${FRONTEND_IMAGE} ${REGISTRY_URL}/${USER_DEPLOY}/${FRONTEND_IMAGE}
-                                    echo " Tagging backend image: ${BACKEND_IMAGE}"
-                                    docker tag ${BACKEND_IMAGE} ${REGISTRY_URL}/${USER_DEPLOY}/${BACKEND_IMAGE}
-                                    echo "${REG_PASS}" | docker login ${REGISTRY_URL} -u "${REG_USER}" --password-stdin
-                                    echo " Push images"
-                                    docker push ${REGISTRY_URL}/${USER_DEPLOY}/${BACKEND_IMAGE}
-                                    docker push ${REGISTRY_URL}/${USER_DEPLOY}/${FRONTEND_IMAGE}
-                                    docker logout ${REGISTRY_URL}
-                                '''
-                }
-                }
-            }
-        }
+        // stage('5. Push image to hub'){
+        //     steps{
+        //         script{
+        //              withCredentials([usernamePassword(
+        //                         credentialsId: env.REGISTRY_CREDENTIAL, 
+        //                         usernameVariable: 'REG_USER', 
+        //                         passwordVariable: 'REG_PASS')]
+        //                         ){
+        //                         sh '''
+        //                             echo " Tagging frontend image: ${FRONTEND_IMAGE}"
+        //                             docker tag ${FRONTEND_IMAGE} ${REGISTRY_URL}/${USER_DEPLOY}/${FRONTEND_IMAGE}
+        //                             echo " Tagging backend image: ${BACKEND_IMAGE}"
+        //                             docker tag ${BACKEND_IMAGE} ${REGISTRY_URL}/${USER_DEPLOY}/${BACKEND_IMAGE}
+        //                             echo "${REG_PASS}" | docker login ${REGISTRY_URL} -u "${REG_USER}" --password-stdin
+        //                             echo " Push images"
+        //                             docker push ${REGISTRY_URL}/${USER_DEPLOY}/${BACKEND_IMAGE}
+        //                             docker push ${REGISTRY_URL}/${USER_DEPLOY}/${FRONTEND_IMAGE}
+        //                             docker logout ${REGISTRY_URL}
+        //                         '''
+        //         }
+        //         }
+        //     }
+        // }
     } // End of stages
 
     // --- Post-build Actions ---
