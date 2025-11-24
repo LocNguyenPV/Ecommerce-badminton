@@ -41,10 +41,10 @@ pipeline {
         
         // --- Stage 2: Build Production Docker Images ---
         stage('2. Run Docker Compose') {
-            echo "INFO: Building Docker Compose"
-                            // Build the Docker image using the Dockerfile in the current directory (.)
-                            // The image will be tagged with the name defined in FRONTEND_IMAGE
-            sh "docker compose up ${env.FRONTEND_IMAGE} -d" 
+            steps {
+                echo "INFO: Building Docker Compose"
+                sh "docker compose up ${env.FRONTEND_IMAGE} -d" 
+            }
         } // End Stage 2
         
         // --- Stage 4: Deploy Containers to Docker Host ---
