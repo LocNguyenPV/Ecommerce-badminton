@@ -10,7 +10,6 @@ using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-
 // Add DbContext
 builder.Services.AddDbContext<ECommerceDbContext>(options =>
     options.UseSqlServer(
@@ -69,8 +68,18 @@ if (app.Environment.IsDevelopment())
 
 using (var scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<ECommerceDbContext>();
-    await DbInitializer.SeedAsync(context);
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        var context = services.GetRequiredService<ECommerceDbContext>();
+        await context.Database.MigrateAsync();
+        await DbInitializer.SeedAsync(context);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Migration failed");
+    }
 }
 
 app.UseHttpsRedirection();

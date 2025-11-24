@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5201/api/v1", // Thay bằng URL API của bạn
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1", // Thay bằng URL API của bạn
   headers: {
     "Content-Type": "application/json",
   },

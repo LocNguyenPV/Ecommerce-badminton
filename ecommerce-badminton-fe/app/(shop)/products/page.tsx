@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useProducts } from "@/hooks/use-products";
-import { ProductFilters } from "@/types";
+import { ProductDto, ProductFilters } from "@/types";
+import { ProductCard } from "@/components/product/product-card";
 
 export default function ProductsPage() {
   // State để quản lý bộ lọc và phân trang
@@ -47,7 +48,7 @@ export default function ProductsPage() {
       </div>
 
       <div className="product-grid">
-        {data?.items.map((product) => (
+        {data?.items.map((product: ProductDto) => (
           <ProductCard key={product.productId} product={product} />
         ))}
       </div>

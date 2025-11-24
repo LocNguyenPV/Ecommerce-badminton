@@ -1,6 +1,6 @@
 import { useProducts } from "@/hooks/use-products";
 import { ProductCard } from "@/components/product/product-card"; // Giả sử bạn có component này
-import { ProductFilters } from "@/types";
+import { ProductDto, ProductFilters } from "@/types";
 
 export const FeaturedProducts = () => {
   // Định nghĩa filter để lấy 8 sản phẩm đầu tiên, sắp xếp theo tên
@@ -35,7 +35,7 @@ export const FeaturedProducts = () => {
 
         {data && (
           <div className="mt-12 grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
-            {data.items.map((product) => (
+            {data.items.map((product: ProductDto) => (
               <ProductCard key={product.productId} product={product} />
             ))}
           </div>

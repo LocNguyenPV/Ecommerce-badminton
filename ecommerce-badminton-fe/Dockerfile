@@ -1,4 +1,4 @@
-FROM node:18-alpine AS base
+FROM node:22-alpine AS base
 
 # Cài đặt các dependency chỉ cho production
 FROM base AS deps
@@ -21,9 +21,10 @@ RUN npm run build
 # Giai đoạn runner - Image sản phẩm cuối cùng
 FROM base AS runner
 WORKDIR /app
+ARG NEXT_PUBLIC_API_BASE_URL
 
 ENV NODE_ENV=production
-
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_BASE_URL}
 # Tạo một user không phải root để tăng cường bảo mật
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

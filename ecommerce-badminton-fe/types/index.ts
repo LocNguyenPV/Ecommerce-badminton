@@ -52,7 +52,7 @@ export interface BrandDto {
   name: string;
 }
 
-export interface PagedResult {
+export interface PagedResult<T> {
   items: T[];
   totalCount: number;
   page: number;

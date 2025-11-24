@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # SQL Server Database
+  # =============================================================================
+  sqlserver:
+    container_name: ecommerce_sqlserver
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "!65L8XQSakVq*q"
+      MSSQL_PID: "Developer"
+      MSSQL_TCP_PORT: 1433
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "!65L8XQSakVq*q" -Q "SELECT 1" -C || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: always
+  # =============================================================================
+  # ASP.NET Core API
+  # /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT * from sys.server_principals where name = suser_name()" -C || exit 1
+  # =============================================================================
+  be:
+    container_name: ecommerce_be
+    build:
+      context: ./ECommerce.ProductManagement
+      dockerfile: Dockerfile
+      args:
+        BUILD_CONFIGURATION: Release
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=ECommerceBadmintonDB;User Id=SA;Password=!65L8XQSakVq*q;TrustServerCertificate=true
+      # - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=ECommerceBadmintonDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;MultipleActiveResultSets=true
+      - ASPNETCORE_HTTP_PORTS=8080
+    ports:
+      - "5000:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+  
+  fe:
+    container_name: ecommerce_fe
+    build:
+      context: ./ecommerce-badminton-fe
+      dockerfile: Dockerfile
+      args:
+        BUILD_CONFIGURATION: Release
+        NEXT_PUBLIC_API_BASE_URL: http://be:5000/api/v1
+    ports:
+      - "3000:3000"
+    networks:
+      - ecommerce-network
+
+  # =============================================================================
+  # Redis Cache (Optional - for future caching implementation)
+  # =============================================================================
+  redis:
+    container_name: ecommerce_redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecommerce-network
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  ecommerce-network:
+    driver: bridge
+
+volumes:
+  sqlserver_data:
+    driver: local
+  redis_data:
+    driver: local
