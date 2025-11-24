@@ -55,7 +55,7 @@
 
 ## FE
 
-### ** Technology Stack**
+### Technology Stack
 
 - **Front-end:** Next.js 14, TypeScript, TanStack Query, Tailwind CSS.
 - **DevOps:** Docker & Docker Compose.
