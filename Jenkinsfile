@@ -43,7 +43,7 @@ pipeline {
         stage('2. Run Docker Compose') {
             steps {
                 echo "INFO: Building Docker Compose"
-                sh "docker compose up ${env.FRONTEND_IMAGE} -d" 
+                sh "docker compose up -d" 
             }
         } // End Stage 2
         
