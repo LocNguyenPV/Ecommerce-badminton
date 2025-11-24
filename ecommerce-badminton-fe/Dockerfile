@@ -29,8 +29,6 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_BASE_URL}
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy thư mục public từ builder
-COPY --from=builder /app/public ./public
 
 # Tự động tận dụng output memory của Next.js để giảm dung lượng image
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
