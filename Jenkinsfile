@@ -43,6 +43,7 @@ pipeline {
         stage('2. Run Docker Compose') {
             steps {
                 echo "INFO: Building Docker Compose"
+                sh "docker compose down -v" 
                 sh "docker compose up -d" 
             }
         } // End Stage 2
