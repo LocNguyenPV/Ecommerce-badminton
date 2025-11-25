@@ -24,7 +24,9 @@ WORKDIR /app
 ARG NEXT_PUBLIC_API_BASE_URL
 
 ENV NODE_ENV=production
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_BASE_URL}
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_BASE_URL
+
+# RUN echo "NEXT_PUBLIC_API_URL is set to $NEXT_PUBLIC_API_URL"
 # Tạo một user không phải root để tăng cường bảo mật
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

@@ -1,5 +1,6 @@
 import { Providers } from "./providers";
 import "./globals.css";
+import { PublicEnvScript } from "next-runtime-env";
 
 export const metadata = {
   title: "Badminton E-commerce",
@@ -13,6 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi">
+      <head>
+        <PublicEnvScript />
+      </head>
       <body>
         <Providers>{children}</Providers>
       </body>
