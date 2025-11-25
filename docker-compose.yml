@@ -50,7 +50,7 @@ services:
         condition: service_healthy
     networks:
       - ecommerce-network
-      # - shared-network
+      - shared-network
     restart: unless-stopped
   
   fe:
@@ -62,13 +62,12 @@ services:
         BUILD_CONFIGURATION: Release
         NEXT_PUBLIC_API_BASE_URL: https://api-ecommerce.codebyluke.io.vn/api/v1
     environment:
-    # Runtime environment variable (for SSR)
     - NEXT_PUBLIC_API_BASE_URL=https://api-ecommerce.codebyluke.io.vn/api/v1
     ports:
       - "3000:3000"
     networks:
       - ecommerce-network
-      # - shared-network
+      - shared-network
 
   # =============================================================================
   # Redis Cache (Optional - for future caching implementation)
@@ -91,9 +90,9 @@ services:
       retries: 5
 
 networks:
-  # shared-network:
-  #   name: tonytechlab_default
-  #   external: true
+  shared-network:
+    name: tonytechlab_default
+    external: true
 
   ecommerce-network:
     driver: bridge
