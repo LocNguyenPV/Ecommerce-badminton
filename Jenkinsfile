@@ -21,7 +21,7 @@ pipeline {
         
         // --- Docker Network ---
         // Specify the Docker network the containers should connect to (must exist)
-        DOCKER_NETWORK      = 'tonytechlab_default' 
+        DOCKER_NETWORK      = '' 
 
 
         // --- Registry Config --

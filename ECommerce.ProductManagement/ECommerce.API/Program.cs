@@ -73,7 +73,7 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<ECommerceDbContext>();
-        await context.Database.MigrateAsync();
+        await context.Database.EnsureCreatedAsync();
         await DbInitializer.SeedAsync(context);
     }
     catch (Exception ex)
