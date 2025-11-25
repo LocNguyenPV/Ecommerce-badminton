@@ -46,8 +46,10 @@ pipeline {
                 sh "docker compose down -v" 
                 sh "docker stop ${env.FRONTEND_CONTAINER} || true"
                 sh "docker rm ${env.FRONTEND_CONTAINER} || true"
+                sh "docker rmi ${env.FRONTEND_IMAGE} || true"
                 sh "docker stop ${env.BACKEND_CONTAINER} || true"
                 sh "docker rm ${env.BACKEND_CONTAINER} || true"
+                sh "docker rmi ${env.BACKEND_IMAGE} || true"
                 sh "docker compose up -d" 
             }
         } // End Stage 2
