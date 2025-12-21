@@ -1,76 +1,95 @@
-// Jenkinsfile - Simple Deploy to Docker Host (Cách 1: All-in-One)
-// Builds production images and runs them on the host Docker daemon.
 pipeline {
-    // Run on the Jenkins controller itself, requires docker-cli installed via Dockerfile
-    agent any 
-
-    environment {
-        // --- Application & Image Naming ---
-        APP_NAME            = 'ecommerce' // Base name for images and containers
-        USER_DEPLOY         = 'root'
-        FRONTEND_IMAGE      = "badminton-store-fe:latest" // Image name for frontend
-        BACKEND_IMAGE       = "badminton-store-be:latest"  // Image name for backend
-        FRONTEND_CONTAINER  = "${APP_NAME}_fe" // Fixed container name for frontend
-        BACKEND_CONTAINER   = "${APP_NAME}_be"  // Fixed container name for backend
-
-        // --- Host Port Configuration ---
-        // Define ports on the Docker HOST machine where the containers will be accessible.
-        // Make sure these ports (e.g., 8081, 5001) are free on your host.
-        FRONTEND_HOST_PORT = 8081 // Access Frontend via http://<HOST_IP>:8081
-        BACKEND_HOST_PORT  = 5000 // Access Backend via http://<HOST_IP>:5001
-        
-        // --- Docker Network ---
-        // Specify the Docker network the containers should connect to (must exist)
-        DOCKER_NETWORK      = '' 
-
-
-        // --- Registry Config --
-        REGISTRY_URL = 'registry.codebyluke.io.vn'       
-        REGISTRY_CREDENTIAL = 'docker-registry-creds'       
-    }
-
-    stages {
-        // --- Stage 1: Get latest code ---
-        stage('1. Checkout Code') {
-            steps {
-                // Use Jenkins built-in SCM checkout step
-                checkout scm 
-                echo "SUCCESS: Code checked out from GitLab."
-            }
-        }
-        
-        // --- Stage 2: Build Production Docker Images ---
-        stage('2. Run Docker Compose') {
-            steps {
-                echo "INFO: Building Docker Compose"
-                sh "docker compose down -v" 
-                sh "docker stop ${env.FRONTEND_CONTAINER} || true"
-                sh "docker rm ${env.FRONTEND_CONTAINER} || true"
-                sh "docker rmi ${env.FRONTEND_IMAGE} || true"
-                sh "docker stop ${env.BACKEND_CONTAINER} || true"
-                sh "docker rm ${env.BACKEND_CONTAINER} || true"
-                sh "docker rmi ${env.BACKEND_IMAGE} || true"
-                sh "docker compose up -d" 
-            }
-        } // End Stage 2
-        
-    } // End of stages
-
-    // --- Post-build Actions ---
-    // Actions to perform after the pipeline finishes
-    post { 
-        always { // Always run these steps
-            echo 'INFO: Pipeline finished execution.'
-            // cleanWs() // Option to clean the Jenkins workspace
-        }
-        success { // Run only on success
-            echo '✅ SUCCESS: Pipeline completed successfully!'
-            // Add success notifications (email, Slack, etc.) here
-        }
-        failure { // Run only on failure
-            echo '❌ FAILED: Pipeline failed!'
-            // Add failure notifications here
-        }
-    } // End of post
+    agent any
     
-} // End of pipeline
+    environment {
+        // CẤU HÌNH CHUNG
+        HARBOR_HOST = 'harbor.local:30080'    // Địa chỉ Harbor
+        HARBOR_PROJECT = 'my-apps'            // Tên project trong Harbor
+        GITLAB_REPO_URL = 'http://gitlab.local/root/ecommerce-project.git' // URL git của bạn
+        
+        // Cấu hình Credentials (Sẽ tạo ở bước 2)
+        HARBOR_CREDS_ID = 'harbor-credentials' 
+        GIT_CREDS_ID = 'gitlab-credentials'
+    }
+    
+    stages {
+        stage('Checkout Code') {
+            steps {
+                // Lấy code mới nhất về
+                git branch: 'main', 
+                    credentialsId: "${env.GIT_CREDS_ID}", 
+                    url: "${env.GITLAB_REPO_URL}"
+            }
+        }
+        
+        stage('Build & Push Backend') {
+            steps {
+                script {
+                    echo '--- BUILDING BACKEND ---'
+                    // Định nghĩa tên ảnh với Tag là số lần build (Build Number)
+                    def beImage = "${HARBOR_HOST}/${HARBOR_PROJECT}/ecommerce-be:${env.BUILD_NUMBER}"
+                    
+                    // Build Docker (Dùng Dockerfile trong thư mục BE)
+                    dir('ECommerce.ProductManagement') {
+                        sh "docker build -t ${beImage} ."
+                    }
+                    
+                    // Đăng nhập và Push lên Harbor
+                    withCredentials([usernamePassword(credentialsId: "${env.HARBOR_CREDS_ID}", usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                        sh "docker login ${HARBOR_HOST} -u $USER -p $PASS"
+                        sh "docker push ${beImage}"
+                    }
+                }
+            }
+        }
+        
+        stage('Build & Push Frontend') {
+            steps {
+                script {
+                    echo '--- BUILDING FRONTEND ---'
+                    def feImage = "${HARBOR_HOST}/${HARBOR_PROJECT}/ecommerce-fe:${env.BUILD_NUMBER}"
+                    
+                    // Build Docker (Dùng Dockerfile trong thư mục FE)
+                    dir('ecommerce-badminton-fe') {
+                        // Lưu ý: NextJS cần biến môi trường lúc Build nếu dùng static generation
+                        // Ở đây ta build image bình thường
+                        sh "docker build -t ${feImage} ."
+                    }
+                    
+                    // Push
+                    sh "docker push ${feImage}"
+                }
+            }
+        }
+        
+        stage('Update Manifest (GitOps)') {
+            steps {
+                script {
+                    echo '--- UPDATING K8S MANIFESTS ---'
+                    
+                    // Cấu hình Git để commit
+                    sh 'git config user.email "jenkins@bot.com"'
+                    sh 'git config user.name "Jenkins Bot"'
+                    
+                    // 1. Sửa file Backend (Thay tag cũ bằng tag BUILD_NUMBER mới)
+                    // Tìm dòng chứa "image: .../ecommerce-be:" và thay số đuôi
+                    sh "sed -i 's|ecommerce-be:.*|ecommerce-be:${env.BUILD_NUMBER}|g' k8s/03-backend.yaml"
+                    
+                    // 2. Sửa file Frontend
+                    sh "sed -i 's|ecommerce-fe:.*|ecommerce-fe:${env.BUILD_NUMBER}|g' k8s/04-frontend.yaml"
+                    
+                    // 3. Commit và Push ngược lại GitLab
+                    // ArgoCD sẽ thấy thay đổi này và tự deploy
+                    withCredentials([usernamePassword(credentialsId: "${env.GIT_CREDS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                        // Cần set lại URL có chứa user:pass để push được
+                        // Cắt bỏ http:// đầu để chèn user:pass vào
+                        def repoClean = env.GITLAB_REPO_URL.replace("http://", "")
+                        sh "git add k8s/"
+                        sh "git commit -m 'Jenkins Update Image to Build ${env.BUILD_NUMBER}'"
+                        sh "git push http://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main"
+                    }
+                }
+            }
+        }
+    }
+}
