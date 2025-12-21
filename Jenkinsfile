@@ -1,6 +1,27 @@
 pipeline {
-    agent any
-    
+    // THAY ĐỔI QUAN TRỌNG: KHÔNG DÙNG 'agent any' NỮA
+    agent {
+        kubernetes {
+            // Định nghĩa một Pod tạm thời có chứa Docker CLI
+            yaml '''
+            apiVersion: v1
+            kind: Pod
+            spec:
+              containers:
+              - name: docker
+                image: docker:latest
+                command: ['sleep']
+                args: ['infinity']
+                volumeMounts:
+                - name: dockersock
+                  mountPath: /var/run/docker.sock
+              volumes:
+              - name: dockersock
+                hostPath:
+                  path: /var/run/docker.sock
+            '''
+        }
+    }
     environment {
         // CẤU HÌNH CHUNG
         HARBOR_HOST = 'harbor.local:30080'    // Địa chỉ Harbor
