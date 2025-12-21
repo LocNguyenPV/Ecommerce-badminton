@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-fe
+  namespace: ecommerce
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ecommerce-fe
+  template:
+    metadata:
+      labels:
+        app: ecommerce-fe
+    spec:
+      containers:
+        - name: fe
+          image: harbor.local:30080/my-apps/ecommerce-fe:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ecommerce-config
+                  key: NEXT_PUBLIC_API_BASE_URL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-fe-service
+  namespace: ecommerce
+spec:
+  type: ClusterIP
+  selector:
+    app: ecommerce-fe
+  ports:
+    - port: 80
+      targetPort: 3000

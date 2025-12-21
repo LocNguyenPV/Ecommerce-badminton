@@ -40,7 +40,7 @@ USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
+ENV PORT=3000
 
 # Lệnh để khởi động server sản phẩm
 CMD ["node", "server.js"]
