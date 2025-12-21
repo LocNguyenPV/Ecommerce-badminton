@@ -1,114 +1,112 @@
-pipeline {
-    // THAY ĐỔI QUAN TRỌNG: KHÔNG DÙNG 'agent any' NỮA
-    agent {
-        kubernetes {
-            // Định nghĩa một Pod tạm thời có chứa Docker CLI
-            yaml '''
-            apiVersion: v1
-            kind: Pod
-            spec:
-              containers:
-              - name: docker
-                image: docker:latest
-                command: ['sleep']
-                args: ['infinity']
-                volumeMounts:
-                - name: dockersock
-                  mountPath: /var/run/docker.sock
-              volumes:
-              - name: dockersock
-                hostPath:
-                  path: /var/run/docker.sock
-            '''
-        }
-    }
-    environment {
-        // CẤU HÌNH CHUNG
-        HARBOR_HOST = 'harbor.local:30080'    // Địa chỉ Harbor
-        HARBOR_PROJECT = 'ecommerce-badminton'            // Tên project trong Harbor
-        GITLAB_REPO_URL = 'https://gitlab.codebyluke.io.vn/root/ecommerce-badminton-hub.git' // URL git của bạn
+def label = "dind-${UUID.randomUUID().toString()}"
+
+podTemplate(label: label, yaml: """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    jenkins: agent
+spec:
+  containers:
+  - name: docker     # Container chứa lệnh CLI để bạn gõ
+    image: docker:20.10.21
+    command: ['cat']
+    tty: true
+    env:
+    - name: DOCKER_HOST
+      value: tcp://localhost:2375  # Trỏ vào thằng DinD bên dưới
+  - name: dind       # Container chạy Docker Daemon (Docker ảo)
+    image: docker:20.10.21-dind
+    securityContext:
+      privileged: true # BẮT BUỘC: Để được quyền tạo Docker con
+    env:
+    - name: DOCKER_TLS_CERTDIR
+      value: ""      # Tắt TLS cho dễ kết nối nội bộ
+"""
+) {
+    node(label) {
+        // --- CẤU HÌNH ---
+        // QUAN TRỌNG: Dùng DNS nội bộ K8s để gọi Harbor (Vì DinD không hiểu harbor.local)
+        // Nếu namespace của Harbor là 'devops-tools', service thường là:
+        env.HARBOR_HOST = 'harbor-harbor-registry.devops-tools.svc.cluster.local:80'
         
-        // Cấu hình Credentials (Sẽ tạo ở bước 2)
-        HARBOR_CREDS_ID = 'harbor-credentials' 
-        GIT_CREDS_ID = 'gitlab-credentials'
-    }
-    
-    stages {
+        env.HARBOR_PROJECT = 'ecommerce-badminton'
+        env.GITLAB_REPO_URL = 'https://gitlab.codebyluke.io.vn/root/ecommerce-badminton-hub.git'
+        
+        env.HARBOR_CREDS_ID = 'harbor-credentials'
+        env.GIT_CREDS_ID = 'gitlab-credentials'
+
         stage('Checkout Code') {
-            steps {
-                // Lấy code mới nhất về
-                git branch: 'main', 
-                    credentialsId: "${env.GIT_CREDS_ID}", 
-                    url: "${env.GITLAB_REPO_URL}"
+            git branch: 'main', 
+                credentialsId: "${env.GIT_CREDS_ID}", 
+                url: "${env.GITLAB_REPO_URL}"
+        }
+
+        stage('Wait for Docker') {
+            container('docker') {
+                // Chờ một chút cho DinD khởi động
+                sh 'sleep 5'
+                sh 'docker version' // Test thử xem có Docker chưa
             }
         }
-        
+
         stage('Build & Push Backend') {
-            steps {
+            container('docker') {
                 script {
                     echo '--- BUILDING BACKEND ---'
-                    // Định nghĩa tên ảnh với Tag là số lần build (Build Number)
-                    def beImage = "${HARBOR_HOST}/${HARBOR_PROJECT}/ecommerce-be:${env.BUILD_NUMBER}"
+                    def beImage = "${env.HARBOR_HOST}/${env.HARBOR_PROJECT}/ecommerce-be:${env.BUILD_NUMBER}"
                     
-                    // Build Docker (Dùng Dockerfile trong thư mục BE)
                     dir('ECommerce.ProductManagement') {
                         sh "docker build -t ${beImage} ."
                     }
                     
-                    // Đăng nhập và Push lên Harbor
+                    // Login vào Harbor
                     withCredentials([usernamePassword(credentialsId: "${env.HARBOR_CREDS_ID}", usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                        sh "docker login ${HARBOR_HOST} -u $USER -p $PASS"
+                        // Vì Harbor nội bộ thường không có SSL xịn, ta thêm --insecure-registry nếu cần
+                        // Nhưng docker login vẫn cần user/pass
+                        sh "docker login ${env.HARBOR_HOST} -u $USER -p $PASS"
                         sh "docker push ${beImage}"
                     }
                 }
             }
         }
-        
+
         stage('Build & Push Frontend') {
-            steps {
+            container('docker') {
                 script {
                     echo '--- BUILDING FRONTEND ---'
-                    def feImage = "${HARBOR_HOST}/${HARBOR_PROJECT}/ecommerce-fe:${env.BUILD_NUMBER}"
+                    def feImage = "${env.HARBOR_HOST}/${env.HARBOR_PROJECT}/ecommerce-fe:${env.BUILD_NUMBER}"
                     
-                    // Build Docker (Dùng Dockerfile trong thư mục FE)
                     dir('ecommerce-badminton-fe') {
-                        // Lưu ý: NextJS cần biến môi trường lúc Build nếu dùng static generation
-                        // Ở đây ta build image bình thường
                         sh "docker build -t ${feImage} ."
                     }
                     
-                    // Push
                     sh "docker push ${feImage}"
                 }
             }
         }
-        
-        stage('Update Manifest (GitOps)') {
-            steps {
-                script {
-                    echo '--- UPDATING K8S MANIFESTS ---'
-                    
-                    // Cấu hình Git để commit
-                    sh 'git config user.email "jenkins@bot.com"'
-                    sh 'git config user.name "Jenkins Bot"'
-                    
-                    // 1. Sửa file Backend (Thay tag cũ bằng tag BUILD_NUMBER mới)
-                    // Tìm dòng chứa "image: .../ecommerce-be:" và thay số đuôi
-                    sh "sed -i 's|ecommerce-be:.*|ecommerce-be:${env.BUILD_NUMBER}|g' k8s/03-backend.yaml"
-                    
-                    // 2. Sửa file Frontend
-                    sh "sed -i 's|ecommerce-fe:.*|ecommerce-fe:${env.BUILD_NUMBER}|g' k8s/04-frontend.yaml"
-                    
-                    // 3. Commit và Push ngược lại GitLab
-                    // ArgoCD sẽ thấy thay đổi này và tự deploy
-                    withCredentials([usernamePassword(credentialsId: "${env.GIT_CREDS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-                        // Cần set lại URL có chứa user:pass để push được
-                        // Cắt bỏ http:// đầu để chèn user:pass vào
-                        def repoClean = env.GITLAB_REPO_URL.replace("http://", "")
-                        sh "git add k8s/"
-                        sh "git commit -m 'Jenkins Update Image to Build ${env.BUILD_NUMBER}'"
-                        sh "git push http://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main"
-                    }
+
+        stage('Update GitOps') {
+            // Bước này chạy ở container jnlp (mặc định)
+            script {
+                sh 'git config user.email "jenkins@bot.com"'
+                sh 'git config user.name "Jenkins Bot"'
+                
+                // Update Image Tag trong file K8s
+                sh "sed -i 's|ecommerce-be:.*|ecommerce-be:${env.BUILD_NUMBER}|g' k8s/03-backend.yaml"
+                sh "sed -i 's|ecommerce-fe:.*|ecommerce-fe:${env.BUILD_NUMBER}|g' k8s/04-frontend.yaml"
+                
+                // QUAN TRỌNG: Sửa luôn domain Harbor trong file yaml thành Internal DNS
+                // Để lúc Pod chạy thật trên K8s nó pull được ảnh
+                def internalHarbor = env.HARBOR_HOST
+                sh "sed -i 's|harbor.local:30080|${internalHarbor}|g' k8s/03-backend.yaml"
+                sh "sed -i 's|harbor.local:30080|${internalHarbor}|g' k8s/04-frontend.yaml"
+
+                withCredentials([usernamePassword(credentialsId: "${env.GIT_CREDS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                    def repoClean = env.GITLAB_REPO_URL.replace("http://", "")
+                    sh "git add k8s/"
+                    sh "git commit -m 'Jenkins Update Image to Build ${env.BUILD_NUMBER}' || true" 
+                    sh "git push http://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main"
                 }
             }
         }
