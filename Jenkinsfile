@@ -4,8 +4,8 @@ pipeline {
     environment {
         // CẤU HÌNH CHUNG
         HARBOR_HOST = 'harbor.local:30080'    // Địa chỉ Harbor
-        HARBOR_PROJECT = 'my-apps'            // Tên project trong Harbor
-        GITLAB_REPO_URL = 'http://gitlab.local/root/ecommerce-project.git' // URL git của bạn
+        HARBOR_PROJECT = 'ecommerce-badminton'            // Tên project trong Harbor
+        GITLAB_REPO_URL = 'https://gitlab.codebyluke.io.vn/root/ecommerce-badminton-hub.git' // URL git của bạn
         
         // Cấu hình Credentials (Sẽ tạo ở bước 2)
         HARBOR_CREDS_ID = 'harbor-credentials' 
