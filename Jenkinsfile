@@ -1,30 +1,6 @@
-def label = "dind-${UUID.randomUUID().toString()}"
-
-podTemplate(label: label, yaml: """
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    jenkins: agent
-spec:
-  containers:
-  - name: docker     # Container chứa lệnh CLI để bạn gõ
-    image: docker:20.10.21
-    command: ['cat']
-    tty: true
-    env:
-    - name: DOCKER_HOST
-      value: tcp://localhost:2375  # Trỏ vào thằng DinD bên dưới
-  - name: dind       # Container chạy Docker Daemon (Docker ảo)
-    image: docker:20.10.21-dind
-    securityContext:
-      privileged: true # BẮT BUỘC: Để được quyền tạo Docker con
-    env:
-    - name: DOCKER_TLS_CERTDIR
-      value: ""      # Tắt TLS cho dễ kết nối nội bộ
-"""
-) {
-    node(label) {
+pipeline {
+    agent any
+    environment {
         // --- CẤU HÌNH ---
         // QUAN TRỌNG: Dùng DNS nội bộ K8s để gọi Harbor (Vì DinD không hiểu harbor.local)
         // Nếu namespace của Harbor là 'devops-tools', service thường là:
@@ -35,7 +11,8 @@ spec:
         
         env.HARBOR_CREDS_ID = 'harbor-creds'
         env.GIT_CREDS_ID = 'gitlab-token'
-
+    }
+    stages {
         stage('Checkout Code') {
             git branch: 'main', 
                 credentialsId: "${env.GIT_CREDS_ID}", 
