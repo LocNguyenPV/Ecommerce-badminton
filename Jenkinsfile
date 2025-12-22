@@ -33,8 +33,8 @@ spec:
         env.HARBOR_PROJECT = 'ecommerce-badminton'
         env.GITLAB_REPO_URL = 'https://gitlab.codebyluke.io.vn/root/ecommerce-badminton-hub.git'
         
-        env.HARBOR_CREDS_ID = 'harbor-credentials'
-        env.GIT_CREDS_ID = 'gitlab-credentials'
+        env.HARBOR_CREDS_ID = 'harbor-creds'
+        env.GIT_CREDS_ID = 'gitlab-token'
 
         stage('Checkout Code') {
             git branch: 'main', 
