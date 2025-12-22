@@ -16,7 +16,7 @@ spec:
       containers:
         - name: be
           # Image này sẽ do Jenkins build và push
-          image: harbor.local:30080/my-apps/ecommerce-be:13
+          image: registry.codebyluke.io.vn/ecommerce-badminton/ecommerce-be:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

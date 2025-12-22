@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: fe
-          image: harbor.local:30080/my-apps/ecommerce-fe:13
+          image: registry.codebyluke.io.vn/ecommerce-badminton/ecommerce-fe:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000

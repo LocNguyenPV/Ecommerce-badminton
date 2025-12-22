@@ -17,4 +17,4 @@ data:
   # Cấu hình URL
   ASPNETCORE_ENVIRONMENT: "Development"
   # URL này là địa chỉ Ingress của BE mà trình duyệt sẽ gọi
-  NEXT_PUBLIC_API_BASE_URL: "http://api.ecommerce.local:30080/api/v1"
+  NEXT_PUBLIC_API_BASE_URL: "http://api.ecommerce.codebyluke.io.vn/api/v1"
