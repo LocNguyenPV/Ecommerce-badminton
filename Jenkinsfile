@@ -11,7 +11,7 @@ pipeline {
         GITLAB_REPO_URL = 'https://gitlab.codebyluke.io.vn/root/ecommerce-badminton-hub.git'
         
         HARBOR_CREDS_ID = 'harbor-creds'
-        GIT_CREDS_ID = 'gitlab-token'
+        GIT_CREDS_ID = 'gitlab-creds'
     }
     
     stages {
@@ -82,14 +82,18 @@ pipeline {
                     
                     // 3. Commit và Push ngược lại GitLab
                     // ArgoCD sẽ thấy thay đổi này và tự deploy
-                    withCredentials([usernamePassword(credentialsId: "${env.GIT_CREDS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-                        // Cần set lại URL có chứa user:pass để push được
-                        // Cắt bỏ http:// đầu để chèn user:pass vào
-                        def repoClean = env.GITLAB_REPO_URL.replace("http://", "")
-                        sh "git add k8s/"
-                        sh "git commit -m 'Jenkins Update Image to Build ${env.BUILD_NUMBER}'"
-                        sh "git push http://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main"
-                    }
+                    withCredentials([usernamePassword(credentialsId: GIT_CREDS_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+    // Repo URL gốc, ví dụ: https://gitlab.com/group/project.git
+    def repoClean = env.GITLAB_REPO_URL.replace("https://", "")
+    
+    sh """
+        git config user.email "ci@example.com"
+        git config user.name "Jenkins CI"
+        git add k8s/
+        git commit -m 'Jenkins Update Image to Build ${env.BUILD_NUMBER}' || echo "No changes to commit"
+        git push https://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main
+    """
+}
                 }
             }
         }
