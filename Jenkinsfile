@@ -4,13 +4,13 @@ pipeline {
         // --- CẤU HÌNH ---
         // QUAN TRỌNG: Dùng DNS nội bộ K8s để gọi Harbor (Vì DinD không hiểu harbor.local)
         // Nếu namespace của Harbor là 'devops-tools', service thường là:
-        env.HARBOR_HOST = 'harbor-harbor-registry.devops-tools.svc.cluster.local:80'
+        HARBOR_HOST = 'harbor-harbor-registry.devops-tools.svc.cluster.local:80'
         
-        env.HARBOR_PROJECT = 'ecommerce-badminton'
-        env.GITLAB_REPO_URL = 'https://gitlab.codebyluke.io.vn/root/ecommerce-badminton-hub.git'
+        HARBOR_PROJECT = 'ecommerce-badminton'
+        GITLAB_REPO_URL = 'https://gitlab.codebyluke.io.vn/root/ecommerce-badminton-hub.git'
         
-        env.HARBOR_CREDS_ID = 'harbor-creds'
-        env.GIT_CREDS_ID = 'gitlab-token'
+        HARBOR_CREDS_ID = 'harbor-creds'
+        GIT_CREDS_ID = 'gitlab-token'
     }
     stages {
         stage('Checkout Code') {
