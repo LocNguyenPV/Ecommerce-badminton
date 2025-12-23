@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: be
-          image: registry.codebyluke.io.vn/ecommerce-badminton/ecommerce-be:13
+          image: registry.codebyluke.io.vn/ecommerce-badminton/ecommerce-be:18
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
