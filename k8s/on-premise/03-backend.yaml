@@ -15,8 +15,7 @@ spec:
     spec:
       containers:
         - name: be
-          # Image này sẽ do Jenkins build và push
-          image: registry.codebyluke.io.vn/ecommerce-badminton/ecommerce-be:latest
+          image: registry.codebyluke.io.vn/ecommerce-badminton/ecommerce-be:13
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -26,7 +25,6 @@ spec:
                 configMapKeyRef:
                   name: ecommerce-config
                   key: ASPNETCORE_ENVIRONMENT
-            # Quan trọng: K8s ghép chuỗi kết nối động
             - name: ConnectionStrings__DefaultConnection
               value: "Server=sqlserver-service;Database=ECommerceBadmintonDB;User Id=SA;Password=!65L8XQSakVq*q;TrustServerCertificate=true"
 ---
@@ -41,6 +39,6 @@ spec:
     app: ecommerce-be
   ports:
     - protocol: TCP
-      port: 80 # Port nội bộ của Service
-      targetPort: 8080 # Port mà ứng dụng trong Pod đang chạy
-      nodePort: 30002 # Port để truy cập từ ngoài (30000-32767)
+      port: 80 # Port nội bộ trong cluster
+      targetPort: 8080 # Port thực tế của app .NET
+      nodePort: 30002 # Truy cập ngoài qua: <NodeIP>:30002
