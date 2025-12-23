@@ -52,15 +52,14 @@ pipeline {
                     }
                     
                     // 2. Update Manifest để ArgoCD deploy lên cụm Lab On-premise
-                    sh "sed -i 's|${BE_IMAGE_NAME}:.*|${BE_IMAGE_NAME}:${IMAGE_TAG}|g' k8s/03-backend.yaml"
-                    sh "sed -i 's|${FE_IMAGE_NAME}:.*|${FE_IMAGE_NAME}:${IMAGE_TAG}|g' k8s/04-frontend.yaml"
-                    
+                    sh "sed -i 's|${BE_IMAGE_NAME}:.*|${BE_IMAGE_NAME}:${IMAGE_TAG}|g' k8s/on-premise/03-backend.yaml"
+                    sh "sed -i 's|${FE_IMAGE_NAME}:.*|${FE_IMAGE_NAME}:${IMAGE_TAG}|g' k8s/on-premise/04-frontend.yaml"
                     withCredentials([usernamePassword(credentialsId: GIT_CREDS_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
                         def repoClean = env.GITLAB_REPO_URL.replace("https://", "")
                         sh """
                             git config user.email "jenkins@bot.com"
                             git config user.name "Jenkins Bot"
-                            git add k8s/
+                            git add k8s/on-premise/
                             git commit -m 'Deploy to Lab - Build ${IMAGE_TAG}' || echo "No changes"
                             git push https://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main
                         """
