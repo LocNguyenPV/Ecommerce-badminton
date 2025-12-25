@@ -10,7 +10,8 @@ pipeline {
         // Nếu namespace của Harbor là 'devops-tools', service thường là:
         HARBOR_HOST = 'registry.codebyluke.io.vn'
         HARBOR_PROJECT = 'ecommerce-badminton'
-        GITLAB_REPO_URL = 'https://gitlab.codebyluke.io.vn/root/ecommerce-badminton-hub.git'
+        GITLAB_REPO_CODE_URL = 'https://gitlab.codebyluke.io.vn/hybrid-cloud/ecommerce-badminton-hub.git'
+        GITLAB_REPO_MANIFEST_URL = 'https://gitlab.codebyluke.io.vn/hybrid-cloud/manifest.git'
         
         HARBOR_CREDS_ID = 'harbor-creds'
         GIT_CREDS_ID = 'gitlab-creds'
@@ -27,11 +28,10 @@ pipeline {
         // ID của Secret File chứa JSON Key trong Jenkins
         GCP_CREDS_ID = "gcp-service-account-key"
     }
-    
    stages {
         stage('Checkout & Build') {
             steps {
-                git branch: 'main', credentialsId: "${GIT_CREDS_ID}", url: "${GITLAB_REPO_URL}"
+                git branch: 'main', credentialsId: "${GIT_CREDS_ID}", url: "${GITLAB_REPO_CODE_URL}"
                 script {
                     dir('ECommerce.ProductManagement') { sh "docker build -t ${BE_IMAGE_NAME}:${IMAGE_TAG} ." }
                     dir('ecommerce-badminton-fe') { sh "docker build -t ${FE_IMAGE_NAME}:${IMAGE_TAG} ." }
@@ -39,8 +39,9 @@ pipeline {
             }
         }
         
-        stage('Push to Harbor & Update Manifest') {
+        stage('Push to Harbor') {
             steps {
+                git branch: 'main', url: "${GITLAB_REPO_MANIFEST_URL}"
                 script {
                     // 1. Push lên Harbor (Lab environment)
                     withCredentials([usernamePassword(credentialsId: "${HARBOR_CREDS_ID}", usernameVariable: 'USER', passwordVariable: 'PASS')]) {
@@ -52,10 +53,14 @@ pipeline {
                     }
                     
                     // 2. Update Manifest để ArgoCD deploy lên cụm Lab On-premise
-                    sh "sed -i 's|${BE_IMAGE_NAME}:.*|${BE_IMAGE_NAME}:${IMAGE_TAG}|g' k8s/on-premise/03-backend.yaml"
-                    sh "sed -i 's|${FE_IMAGE_NAME}:.*|${FE_IMAGE_NAME}:${IMAGE_TAG}|g' k8s/on-premise/04-frontend.yaml"
+                     docker.image('line/kubectl-kustomize').inside {
+                        dir('k8s/overlays/lab') {
+                            sh "kustomize edit set image ecommerce-be=${HARBOR_HOST}/${HARBOR_PROJECT}/${BE_IMAGE_NAME}:${IMAGE_TAG}"
+                            sh "kustomize edit set image ecommerce-fe=${HARBOR_HOST}/${HARBOR_PROJECT}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
+                        }
+                     }
                     withCredentials([usernamePassword(credentialsId: GIT_CREDS_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-                        def repoClean = env.GITLAB_REPO_URL.replace("https://", "")
+                        def repoClean = env.GITLAB_REPO_MANIFEST_URL.replace("https://", "")
                         sh """
                             git config user.email "jenkins@bot.com"
                             git config user.name "Jenkins Bot"
@@ -67,7 +72,6 @@ pipeline {
                 }
             }
         }
-
     // stage('QA Confirmation') {
     //     steps {
     //         script {
@@ -107,6 +111,31 @@ pipeline {
                         sh "docker push ${beGCP}"
                         sh "docker push ${feGCP}"
                     }
+                }
+            }
+        }
+
+        stage('Update Manifest Repo') {
+            steps {
+                script {
+                    docker.image('line/kubectl-kustomize').inside {    
+                        // Update cho GKE (GCP)
+                        dir('k8s/overlays/gke') {
+                            sh "kustomize edit set image ecommerce-be=${REGISTRY_URL}/${BE_IMAGE_NAME}:${IMAGE_TAG}"
+                            sh "kustomize edit set image ecommerce-fe=${REGISTRY_URL}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
+                        }
+
+                    }
+                    withCredentials([usernamePassword(credentialsId: GIT_CREDS_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                                def repoClean = env.GITLAB_REPO_MANIFEST_URL.replace("https://", "")
+                                sh """
+                                    git config user.email "jenkins@bot.com"
+                                    git config user.name "Jenkins Bot"
+                                    git add .
+                                    git commit -m 'Deploy to GKE - Build ${IMAGE_TAG}' || echo "No changes"
+                                    git push https://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main
+                                """
+                            }
                 }
             }
         }
