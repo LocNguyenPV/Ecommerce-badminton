@@ -51,7 +51,7 @@ pipeline {
                     
                     // 2. Kustomize cho on-premise
                     docker.image('line/kubectl-kustomize').inside {
-                        dir('manifest-repo/k8s/overlays/on-premise') {
+                        dir('manifest-repo/overlays/on-premise') {
                             sh "kustomize edit set image ecommerce-be=${HARBOR_HOST}/${HARBOR_PROJECT}/${BE_IMAGE_NAME}:${IMAGE_TAG}"
                             sh "kustomize edit set image ecommerce-fe=${HARBOR_HOST}/${HARBOR_PROJECT}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
                         }
@@ -64,7 +64,7 @@ pipeline {
                             sh """
                                 git config user.email "jenkins@bot.com"
                                 git config user.name "Jenkins Bot"
-                                git add k8s/overlays/on-premise/
+                                git add overlays/on-premise/
                                 git commit -m 'GitOps: Deploy to On-premise - Build ${IMAGE_TAG}' || echo "No changes"
                                 git push https://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main
                             """
@@ -136,7 +136,7 @@ pipeline {
 
                     // 2. Kustomize cho GKE
                     docker.image('line/kubectl-kustomize').inside {
-                        dir('manifest-repo/k8s/overlays/cloud') {
+                        dir('manifest-repo/overlays/cloud') {
                             sh "kustomize edit set image ecommerce-be=${REGISTRY_URL}/${BE_IMAGE_NAME}:${IMAGE_TAG}"
                             sh "kustomize edit set image ecommerce-fe=${REGISTRY_URL}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
                         }
@@ -147,7 +147,7 @@ pipeline {
                         withCredentials([usernamePassword(credentialsId: GIT_CREDS_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
                             def repoClean = env.GITLAB_REPO_MANIFEST_URL.replace("https://", "")
                             sh """
-                                git add k8s/overlays/cloud/
+                                git add overlays/cloud/
                                 git commit -m 'GitOps: Deploy to GKE - Build ${IMAGE_TAG}' || echo "No changes"
                                 git push https://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main
                             """
