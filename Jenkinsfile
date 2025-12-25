@@ -41,7 +41,7 @@ pipeline {
         
         stage('Push to Harbor') {
             steps {
-                git branch: 'main', url: "${GITLAB_REPO_MANIFEST_URL}"
+                git branch: 'main', credentialsId: "${GIT_CREDS_ID}", url: "${GITLAB_REPO_MANIFEST_URL}"
                 script {
                     // 1. Push lên Harbor (Lab environment)
                     withCredentials([usernamePassword(credentialsId: "${HARBOR_CREDS_ID}", usernameVariable: 'USER', passwordVariable: 'PASS')]) {
