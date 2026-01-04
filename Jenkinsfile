@@ -24,14 +24,16 @@ pipeline {
         stage('Checkout & Build') {
             steps {
                 git branch: 'main', credentialsId: "${GIT_CREDS_ID}", url: "${GITLAB_REPO_CODE_URL}"
-                parallel(
-                    "Build Backend": {
-                        dir('ECommerce.ProductManagement') { sh "docker build -t ${BE_IMAGE_NAME}:${IMAGE_TAG} ." }
-                    },
-                    "Build Frontend": {
-                        dir('ecommerce-badminton-fe') { sh "docker build -t ${FE_IMAGE_NAME}:${IMAGE_TAG} ." }
-                    }
-                )
+                script { // Bọc parallel vào đây
+                    parallel(
+                        "Build Backend": {
+                            dir('ECommerce.ProductManagement') { sh "docker build -t ${BE_IMAGE_NAME}:${IMAGE_TAG} ." }
+                        },
+                        "Build Frontend": {
+                            dir('ecommerce-badminton-fe') { sh "docker build -t ${FE_IMAGE_NAME}:${IMAGE_TAG} ." }
+                        }
+                    )
+                }
             }
         }
         
