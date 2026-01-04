@@ -11,7 +11,7 @@ pipeline {
         GITLAB_REPO_MANIFEST_URL = 'https://gitlab.codebyluke.io.vn/hybrid-cloud/manifest.git'
         
         HARBOR_CREDS_ID = 'harbor-creds'
-        GIT_CREDS_ID = 'gitlab-creds'
+        GIT_CREDS_ID = 'gitlab-ssh-key'
 
         PROJECT_ID = "devops-476202"
         LOCATION   = "asia-southeast1"
@@ -117,44 +117,44 @@ pipeline {
 
     // }
 
-        stage('Push to GCP & GKE Deploy') {
-            steps {
-                script {
-                    // 1. Push lên GCP
-                    withCredentials([file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY')]) {
-                        sh "gcloud auth activate-service-account --key-file=${GCP_KEY}"
-                        sh "gcloud auth configure-docker ${LOCATION}-docker.pkg.dev --quiet"
+        // stage('Push to GCP & GKE Deploy') {
+        //     steps {
+        //         script {
+        //             // 1. Push lên GCP
+        //             withCredentials([file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY')]) {
+        //                 sh "gcloud auth activate-service-account --key-file=${GCP_KEY}"
+        //                 sh "gcloud auth configure-docker ${LOCATION}-docker.pkg.dev --quiet"
                         
-                        def beGCP = "${REGISTRY_URL}/${BE_IMAGE_NAME}:${IMAGE_TAG}"
-                        def feGCP = "${REGISTRY_URL}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
+        //                 def beGCP = "${REGISTRY_URL}/${BE_IMAGE_NAME}:${IMAGE_TAG}"
+        //                 def feGCP = "${REGISTRY_URL}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
 
-                        sh "docker tag ${BE_IMAGE_NAME}:${IMAGE_TAG} ${beGCP}"
-                        sh "docker tag ${FE_IMAGE_NAME}:${IMAGE_TAG} ${feGCP}"
-                        sh "docker push ${beGCP}"
-                        sh "docker push ${feGCP}"
-                    }
+        //                 sh "docker tag ${BE_IMAGE_NAME}:${IMAGE_TAG} ${beGCP}"
+        //                 sh "docker tag ${FE_IMAGE_NAME}:${IMAGE_TAG} ${feGCP}"
+        //                 sh "docker push ${beGCP}"
+        //                 sh "docker push ${feGCP}"
+        //             }
 
-                    // 2. Kustomize cho GKE
-                    docker.image('line/kubectl-kustomize').inside {
-                        dir('manifest-repo/overlays/cloud') {
-                            sh "kustomize edit set image ecommerce-be=${REGISTRY_URL}/${BE_IMAGE_NAME}:${IMAGE_TAG}"
-                            sh "kustomize edit set image ecommerce-fe=${REGISTRY_URL}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
-                        }
-                    }
+        //             // 2. Kustomize cho GKE
+        //             docker.image('line/kubectl-kustomize').inside {
+        //                 dir('manifest-repo/overlays/cloud') {
+        //                     sh "kustomize edit set image ecommerce-be=${REGISTRY_URL}/${BE_IMAGE_NAME}:${IMAGE_TAG}"
+        //                     sh "kustomize edit set image ecommerce-fe=${REGISTRY_URL}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
+        //                 }
+        //             }
 
-                    // 3. Push Git Manifest GKE
-                    dir('manifest-repo') {
-                        withCredentials([usernamePassword(credentialsId: GIT_CREDS_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-                            def repoClean = env.GITLAB_REPO_MANIFEST_URL.replace("https://", "")
-                            sh """
-                                git add overlays/cloud/
-                                git commit -m 'GitOps: Deploy to GKE - Build ${IMAGE_TAG}' || echo "No changes"
-                                git push https://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main
-                            """
-                        }
-                    }
-                }
-            }
-        }
+        //             // 3. Push Git Manifest GKE
+        //             dir('manifest-repo') {
+        //                 withCredentials([usernamePassword(credentialsId: GIT_CREDS_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+        //                     def repoClean = env.GITLAB_REPO_MANIFEST_URL.replace("https://", "")
+        //                     sh """
+        //                         git add overlays/cloud/
+        //                         git commit -m 'GitOps: Deploy to GKE - Build ${IMAGE_TAG}' || echo "No changes"
+        //                         git push https://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main
+        //                     """
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     }
 }
