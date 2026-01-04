@@ -24,11 +24,14 @@ pipeline {
         stage('Checkout & Build') {
             steps {
                 git branch: 'main', credentialsId: "${GIT_CREDS_ID}", url: "${GITLAB_REPO_CODE_URL}"
-                script {
-                    // Build một lần duy nhất, dùng cho cả 2 môi trường
-                    dir('ECommerce.ProductManagement') { sh "docker build -t ${BE_IMAGE_NAME}:${IMAGE_TAG} ." }
-                    dir('ecommerce-badminton-fe') { sh "docker build -t ${FE_IMAGE_NAME}:${IMAGE_TAG} ." }
-                }
+                parallel(
+                    "Build Backend": {
+                        dir('ECommerce.ProductManagement') { sh "docker build -t ${BE_IMAGE_NAME}:${IMAGE_TAG} ." }
+                    },
+                    "Build Frontend": {
+                        dir('ecommerce-badminton-fe') { sh "docker build -t ${FE_IMAGE_NAME}:${IMAGE_TAG} ." }
+                    }
+                )
             }
         }
         
@@ -60,13 +63,14 @@ pipeline {
                     // 3. Push Git Manifest on-premise
                     dir('manifest-repo') {
                         sshagent(credentials: [GIT_CREDS_ID]) {
-                            def repoClean = env.GITLAB_REPO_MANIFEST_URL.replace("https://", "")
                             sh """
                                 git config user.email "jenkins@bot.com"
                                 git config user.name "Jenkins Bot"
                                 git add overlays/on-premise/
                                 git commit -m 'GitOps: Deploy to On-premise - Build ${IMAGE_TAG}' || echo "No changes"
-                                git push https://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main
+                                
+                                git remote set-url origin ssh://git@gitlab/hybrid-cloud/manifest.git
+                                git push origin HEAD:main
                             """
                         }
                     }
