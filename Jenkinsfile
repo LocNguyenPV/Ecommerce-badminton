@@ -59,7 +59,7 @@ pipeline {
                     
                     // 3. Push Git Manifest on-premise
                     dir('manifest-repo') {
-                        withCredentials([usernamePassword(credentialsId: GIT_CREDS_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                        sshagent(credentials: [GIT_CREDS_ID]) {
                             def repoClean = env.GITLAB_REPO_MANIFEST_URL.replace("https://", "")
                             sh """
                                 git config user.email "jenkins@bot.com"
