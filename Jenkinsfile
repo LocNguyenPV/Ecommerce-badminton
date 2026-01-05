@@ -127,18 +127,21 @@ pipeline {
             steps {
                 script {
                     // 1. Push lên GCP
-                    withCredentials([file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY')]) {
-                        sh "gcloud auth activate-service-account --key-file=${GCP_KEY}"
-                        sh "gcloud auth configure-docker ${LOCATION}-docker.pkg.dev --quiet"
-                        
-                        def beGCP = "${REGISTRY_URL}/${BE_IMAGE_NAME}:${IMAGE_TAG}"
-                        def feGCP = "${REGISTRY_URL}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
+                    docker.image('google/cloud-sdk:latest').inside {
+                        withCredentials([file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY')]) {
+                            sh "gcloud auth activate-service-account --key-file=${GCP_KEY}"
+                            sh "gcloud auth configure-docker     ${LOCATION}-docker.pkg.dev --quiet"
+                            
+                            def beGCP = "${REGISTRY_URL}/${BE_IMAGE_NAME}:${IMAGE_TAG}"
+                            def feGCP = "${REGISTRY_URL}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
 
-                        sh "docker tag ${BE_IMAGE_NAME}:${IMAGE_TAG} ${beGCP}"
-                        sh "docker tag ${FE_IMAGE_NAME}:${IMAGE_TAG} ${feGCP}"
-                        sh "docker push ${beGCP}"
-                        sh "docker push ${feGCP}"
+                            sh "docker tag ${BE_IMAGE_NAME}:${IMAGE_TAG} ${beGCP}"
+                            sh "docker tag ${FE_IMAGE_NAME}:${IMAGE_TAG} ${feGCP}"
+                            sh "docker push ${beGCP}"
+                            sh "docker push ${feGCP}"
+                        }
                     }
+                    
                     // 2. Kustomize cho GKE
                     docker.image('line/kubectl-kustomize').inside {
                         dir('manifest-repo/ecommerce/overlays/cloud') {
