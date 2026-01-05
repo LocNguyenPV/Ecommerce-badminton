@@ -126,9 +126,8 @@ pipeline {
         stage('Push to GCP & GKE Deploy') {
             steps {
                 script {
-                    // 1. Push lên GCP
-                    docker.image('google/cloud-sdk:latest').inside {
-                        withCredentials([file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY')]) {
+                    // 1. Push lên GCP Artifact Registry
+                    withCredentials([file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY')]) {
                             sh "gcloud auth activate-service-account --key-file=${GCP_KEY}"
                             sh "gcloud auth configure-docker     ${LOCATION}-docker.pkg.dev --quiet"
                             
@@ -139,9 +138,7 @@ pipeline {
                             sh "docker tag ${FE_IMAGE_NAME}:${IMAGE_TAG} ${feGCP}"
                             sh "docker push ${beGCP}"
                             sh "docker push ${feGCP}"
-                        }
                     }
-                    
                     // 2. Kustomize cho GKE
                     docker.image('line/kubectl-kustomize').inside {
                         dir('manifest-repo/ecommerce/overlays/cloud') {
@@ -151,12 +148,15 @@ pipeline {
                     }
                     // 3. Push Git Manifest GKE
                     dir('manifest-repo') {
-                        withCredentials([usernamePassword(credentialsId: GIT_CREDS_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-                            def repoClean = env.GITLAB_REPO_MANIFEST_URL.replace("https://", "")
+                        sshagent(credentials: [GIT_CREDS_ID]) {
                             sh """
+                                git config user.email "jenkins@bot.com"
+                                git config user.name "Jenkins Bot"
                                 git add ecommerce/overlays/cloud/
                                 git commit -m 'GitOps: Deploy to GKE - Build ${IMAGE_TAG}' || echo "No changes"
-                                git push https://${GIT_USER}:${GIT_PASS}@${repoClean} HEAD:main
+                                
+                                git remote set-url origin ssh://git@gitlab/hybrid-cloud/manifest.git
+                                git push origin HEAD:main
                             """
                         }
                     }
