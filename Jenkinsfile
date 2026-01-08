@@ -81,47 +81,31 @@ pipeline {
         }
 
         // Nếu bạn mở khóa stage QA, nó sẽ nằm ở đây
-        // stage('QA Confirmation') {
+        stage('QA Confirmation') {
 
-    //     steps {
+        steps {
+            script {
+                def qaResult = input(
+                    message: "Xác nhận kết quả kiểm thử",
+                    parameters: [
+                        string(name: 'QA_NAME', defaultValue: '', description: 'Tên người kiểm thử'),
+                        choice(name: 'TEST_STATUS', choices: 'PASSED\nFAILED', description: 'Kết quả test')
+                    ],
+                    submitter: "qa"
+                )
 
-    //         script {
+                // Lưu vào biến môi trường để stage sau sử dụng
+                env.APPROVER = qaResult['QA_NAME']
 
-    //             def qaResult = input(
+                if (qaResult['TEST_STATUS'] == 'FAILED') {
+                    error "❌ Pipeline bị dừng bởi ${env.APPROVER} do Test thất bại!"
+                }
+                
+                echo "✅ QA ${env.APPROVER} đã phê duyệt bản build này."
+            }
+        }
 
-    //                 message: "Xác nhận kết quả kiểm thử",
-
-    //                 parameters: [
-
-    //                     string(name: 'QA_NAME', defaultValue: '', description: 'Tên người kiểm thử'),
-
-    //                     choice(name: 'TEST_STATUS', choices: ['PASSED', 'FAILED'], description: 'Kết quả test')
-
-    //                 ],
-
-    //                 submitter: "luke,qa-lead"
-
-    //             )
-
-               
-
-    //             // Nếu chọn FAILED, ta chủ động hủy pipeline luôn
-
-    //             if (qaResult['TEST_STATUS'] == 'FAILED') {
-
-    //                 error "Pipeline bị dừng do QA báo kết quả Test thất bại!"
-
-    //             }
-
-               
-
-    //             echo "QA ${qaResult['QA_NAME']} đã phê duyệt bản build này."
-
-    //         }
-
-    //     }
-
-    // }
+    }
 
         stage('Push to GCP & GKE Deploy') {
             steps {
