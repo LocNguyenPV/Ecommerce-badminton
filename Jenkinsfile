@@ -80,6 +80,21 @@ pipeline {
             }
         }
 
+        stage('Notify QA') {
+        steps {
+            withCredentials([
+                string(credentialsId: 'TELEGRAM_BOT_TOKEN', variable: 'TOKEN'),
+                string(credentialsId: 'TELEGRAM_CHAT_ID', variable: 'CHAT')
+            ]) {
+                script {
+                    def message = "🔔 *Pipeline Chờ Duyệt*\n 
+                    Build: ${env.JOB_NAME} 
+                    #${env.BUILD_NUMBER}\n
+                    👉 [Click để Approve](${env.BUILD_URL} input)"
+                    sh "curl -s -X POST https://api.telegram.org/bot${TOKEN}/sendMessage -d chat_id=${CHAT} -d parse_mode=Markdown -d text='${message}'"
+                }
+            }
+    }
         // Nếu bạn mở khóa stage QA, nó sẽ nằm ở đây
         stage('QA Confirmation') {
 
