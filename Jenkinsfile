@@ -93,10 +93,11 @@ pipeline {
                 Trạng thái: Đang chờ QA xác nhận kết quả test.
                 👉 [Nhấn vào đây để Approve](${env.BUILD_URL}input)
                 """.stripIndent()
-                
+
                     sh "curl -s -X POST https://api.telegram.org/bot${TOKEN}/sendMessage -d chat_id=${CHAT} -d parse_mode=Markdown -d text='${message}'"
                 }
             }
+        }
     }
         // Nếu bạn mở khóa stage QA, nó sẽ nằm ở đây
         stage('QA Confirmation') {
