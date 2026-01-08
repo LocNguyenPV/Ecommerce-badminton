@@ -87,10 +87,13 @@ pipeline {
                 string(credentialsId: 'TELEGRAM_CHAT_ID', variable: 'CHAT')
             ]) {
                 script {
-                    def message = "🔔 *Pipeline Chờ Duyệt*\n 
-                    Build: ${env.JOB_NAME} 
-                    #${env.BUILD_NUMBER}\n
-                    👉 [Click để Approve](${env.BUILD_URL} input)"
+                    def message = """🔔 *Yêu cầu phê duyệt Pipeline*
+                Dự án: ${env.JOB_NAME}
+                Build số: ${env.BUILD_NUMBER}
+                Trạng thái: Đang chờ QA xác nhận kết quả test.
+                👉 [Nhấn vào đây để Approve](${env.BUILD_URL}input)
+                """.stripIndent()
+                
                     sh "curl -s -X POST https://api.telegram.org/bot${TOKEN}/sendMessage -d chat_id=${CHAT} -d parse_mode=Markdown -d text='${message}'"
                 }
             }
