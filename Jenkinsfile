@@ -11,7 +11,7 @@ pipeline {
         GITLAB_REPO_MANIFEST_URL = 'https://gitlab.codebyluke.io.vn/hybrid-cloud/manifest.git'
         
         HARBOR_CREDS_ID = 'harbor-creds'
-        GIT_CREDS_ID = 'gitlab-ssh-key'
+        GIT_CREDS_ID = 'gitlab-pat-creds'
 
         PROJECT_ID = "devops-476202"
         LOCATION   = "asia-southeast1"
@@ -61,18 +61,21 @@ pipeline {
                             sh "kustomize edit set image ecommerce-fe=${HARBOR_HOST}/${HARBOR_PROJECT}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
                         }
                     }
-                    
-                    // 3. Push Git Manifest on-premise
-                    dir('manifest-repo') {
-                        sshagent(credentials: [GIT_CREDS_ID]) {
+
+                    // 3. Push Git Manifest (SỬ DỤNG LẠI PAT ĐỂ PUSH)
+                    withCredentials([usernamePassword(credentialsId: "${GIT_CREDS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+                        dir('manifest-repo') {
                             sh """
                                 git config user.email "jenkins@bot.com"
                                 git config user.name "Jenkins Bot"
-                                git add ecommerce/overlays/on-premise/
-                                git commit -m 'GitOps: Deploy to On-premise - Build ${IMAGE_TAG}' || echo "No changes"
                                 
-                                git remote set-url origin ssh://git@gitlab/hybrid-cloud/manifest.git
-                                git push origin HEAD:main
+                                
+                                git add ecommerce/overlays/on-premise/
+                                git commit -m 'GitOps: Deploy to On-premise - Build ${IMAGE_TAG}' || echo "No changes to commit"
+                                
+                                # QUAN TRỌNG: Gán Token vào URL để Push qua HTTPS
+                                # URL mẫu: https://user:token@git.codebyluke.io.vn/hybrid-cloud/manifest.git
+                                git push https://${GIT_USER}:${GIT_TOKEN}@${GITLAB_REPO_MANIFEST_URL.replace('http://', '').replace('https://', '')} HEAD:main
                             """
                         }
                     }
@@ -150,16 +153,20 @@ pipeline {
                         }
                     }
                     // 3. Push Git Manifest GKE
-                    dir('manifest-repo') {
-                        sshagent(credentials: [GIT_CREDS_ID]) {
+                    // 3. Push Git Manifest (SỬ DỤNG LẠI PAT ĐỂ PUSH)
+                    withCredentials([usernamePassword(credentialsId: "${GIT_CREDS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+                        dir('manifest-repo') {
                             sh """
                                 git config user.email "jenkins@bot.com"
                                 git config user.name "Jenkins Bot"
-                                git add ecommerce/overlays/cloud/
-                                git commit -m 'GitOps: Deploy to GKE - Build ${IMAGE_TAG}' || echo "No changes"
                                 
-                                git remote set-url origin ssh://git@gitlab/hybrid-cloud/manifest.git
-                                git push origin HEAD:main
+                                
+                                git add ecommerce/overlays/cloud/
+                                git commit -m 'GitOps: Deploy to GKE - Build ${IMAGE_TAG}' || echo "No changes to commit"
+                                
+                                # QUAN TRỌNG: Gán Token vào URL để Push qua HTTPS
+                                # URL mẫu: https://user:token@git.codebyluke.io.vn/hybrid-cloud/manifest.git
+                                git push https://${GIT_USER}:${GIT_TOKEN}@${GITLAB_REPO_MANIFEST_URL.replace('http://', '').replace('https://', '')} HEAD:main
                             """
                         }
                     }
