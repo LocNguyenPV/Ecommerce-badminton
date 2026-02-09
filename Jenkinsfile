@@ -13,7 +13,7 @@ pipeline {
         HARBOR_CREDS_ID = 'harbor-creds'
         GIT_CREDS_ID = 'gitlab-pat-creds'
 
-        PROJECT_ID = "devops-476202"
+        PROJECT_ID = "devops-485312"
         LOCATION   = "asia-southeast1"
         REPO_NAME  = "ecommerce-repo"
         REGISTRY_URL = "${LOCATION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}"
