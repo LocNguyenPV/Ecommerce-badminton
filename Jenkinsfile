@@ -83,6 +83,31 @@ pipeline {
             }
         }
 
+        stage('Generate Release Notes') {
+            steps {
+                script {
+                    // Lấy danh sách các commit từ lần build trước đến hiện tại
+                    // Định dạng: - Nội dung commit (Tên tác giả)
+                    def changeLogSets = currentBuild.changeSets
+                    def notes = ""
+                    
+                    if (changeLogSets.isEmpty()) {
+                        notes = "- Không có thay đổi mã nguồn (có thể chỉ build lại hoặc update manifest)."
+                    } else {
+                        for (int i = 0; i < changeLogSets.size(); i++) {
+                            def entries = changeLogSets[i].items
+                            for (int j = 0; j < entries.length; j++) {
+                                def entry = entries[j]
+                                notes += "- ${entry.msg} _(by ${entry.author.fullName})_\n"
+                            }
+                        }
+                    }
+                    // Lưu vào biến môi trường để dùng cho stage sau
+                    env.RELEASE_NOTES = notes
+                }
+            }
+        }
+
         stage('Notify QA') {
         steps {
             withCredentials([
@@ -90,43 +115,72 @@ pipeline {
                 string(credentialsId: 'TELEGRAM_CHAT_ID', variable: 'CHAT')
             ]) {
                 script {
-                    def message = """🔔 *Yêu cầu phê duyệt Pipeline*
-                Dự án: ${env.JOB_NAME}
-                Build số: ${env.BUILD_NUMBER}
-                Trạng thái: Đang chờ QA xác nhận kết quả test.
-                👉 [Nhấn vào đây để Approve](${env.BUILD_URL}input)
-                """.stripIndent()
+                    def message = """
+                    🔔 *YÊU CẦU PHÊ DUYỆT PIPELINE*
+                    
+                    *Dự án:* ${env.JOB_NAME}
+                    *Build số:* #${env.BUILD_NUMBER}
+                    *Môi trường:* Hybrid Cloud (On-premise)
+                    
+                    📝 *Cập nhật mới (Release Notes):*
+                    ${env.RELEASE_NOTES}
+                    
+                    *Trạng thái:* Đang chờ QA xác nhận kết quả.
+                    👉 [Nhấn vào đây để Approve](${env.BUILD_URL}input)
+                    """.stripIndent()
 
                     sh "curl -s -X POST https://api.telegram.org/bot${TOKEN}/sendMessage -d chat_id=${CHAT} -d parse_mode=Markdown -d text='${message}'"
                 }
             }
         }
     }
-        // Nếu bạn mở khóa stage QA, nó sẽ nằm ở đây
         stage('QA Confirmation') {
+            steps {
+                script {
+                    def qaResult = input(
+                        message: "Xác nhận kết quả kiểm thử",
+                        parameters: [
+                            string(name: 'QA_NAME', defaultValue: '', description: 'Tên người kiểm thử'),
+                            choice(name: 'TEST_STATUS', choices: 'PASSED\nFAILED', description: 'Kết quả test')
+                        ],
+                        submitter: "qa"
+                    )
 
-        steps {
-            script {
-                def qaResult = input(
-                    message: "Xác nhận kết quả kiểm thử",
-                    parameters: [
-                        string(name: 'QA_NAME', defaultValue: '', description: 'Tên người kiểm thử'),
-                        choice(name: 'TEST_STATUS', choices: 'PASSED\nFAILED', description: 'Kết quả test')
-                    ],
-                    submitter: "qa"
-                )
+                    // Lưu vào biến môi trường để stage sau sử dụng
+                    env.APPROVER = qaResult['QA_NAME']
 
-                // Lưu vào biến môi trường để stage sau sử dụng
-                env.APPROVER = qaResult['QA_NAME']
+                    if (qaResult['TEST_STATUS'] == 'FAILED') {
+                        error "❌ Pipeline bị dừng bởi ${env.APPROVER} do Test thất bại!"
+                    }
+                    
+                    echo "✅ QA ${env.APPROVER} đã phê duyệt bản build này."
+                    // --- PHẦN CẬP NHẬT CHANGELOG ---
+                    withCredentials([usernamePassword(credentialsId: "${GIT_CREDS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')])
+                    { 
+                        dir('manifest-repo') { 
+                            def date = new Date().format('yyyy-MM-dd HH:mm')
+                            def newEntry = """
+                            ## [Build #${env.BUILD_NUMBER}] - ${date}
+                            - **Người duyệt:** ${env.APPROVER}
+                            - **Chi tiết thay đổi:**
+                            ${env.RELEASE_NOTES}
+                            ---
+                            """
+                            // Đọc nội dung cũ và ghi nội dung mới lên đầu file
+                            def changelogFile = readFile('CHANGELOG.md') || ""
+                            writeFile(file: 'CHANGELOG.md', text: newEntry + changelogFile)
 
-                if (qaResult['TEST_STATUS'] == 'FAILED') {
-                    error "❌ Pipeline bị dừng bởi ${env.APPROVER} do Test thất bại!"
+                            sh """
+                                git config user.email "jenkins@bot.com" [cite: 13]
+                                git config user.name "Jenkins Bot" [cite: 13]
+                                git add CHANGELOG.md
+                                git commit -m 'docs: Update CHANGELOG.md for Build ${env.BUILD_NUMBER}' || echo "No changes" 
+                                git push https://${GIT_USER}:${GIT_TOKEN}@${GITLAB_REPO_MANIFEST_URL.replace('https://', '')} HEAD:main 
+                            """
+                        }
+                    }
                 }
-                
-                echo "✅ QA ${env.APPROVER} đã phê duyệt bản build này."
             }
-        }
-
     }
 
         stage('Push to GCP & GKE Deploy') {
@@ -135,7 +189,7 @@ pipeline {
                     // 1. Push lên GCP Artifact Registry
                     withCredentials([file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY')]) {
                             sh "gcloud auth activate-service-account --key-file=${GCP_KEY}"
-                            sh "gcloud auth configure-docker     ${LOCATION}-docker.pkg.dev --quiet"
+                            sh "gcloud auth configure-docker ${LOCATION}-docker.pkg.dev --quiet"
                             
                             def beGCP = "${REGISTRY_URL}/${BE_IMAGE_NAME}:${IMAGE_TAG}"
                             def feGCP = "${REGISTRY_URL}/${FE_IMAGE_NAME}:${IMAGE_TAG}"
@@ -145,6 +199,8 @@ pipeline {
                             sh "docker push ${beGCP}"
                             sh "docker push ${feGCP}"
                     }
+
+                    
                     // 2. Kustomize cho GKE
                     docker.image('line/kubectl-kustomize').inside {
                         dir('manifest-repo/ecommerce/overlays/cloud') {
