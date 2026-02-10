@@ -1,3 +1,12 @@
+def getLatestTag() {
+    // Lấy tag gần nhất, nếu không có tag nào sẽ trả về 0.0.0 hoặc giá trị mặc định
+    try {
+        def latestTag = sh(script: "git describe --tags --abbrev=0", returnStdout: true).trim()
+        return latestTag
+    } catch (Exception e) {
+        return "0.0.0" // Giá trị mặc định nếu repo chưa có tag nào
+    }
+}
 def validateCommits() {
     def changeLogSets = currentBuild.changeSets
     if (changeLogSets.size() > 0) {
@@ -23,11 +32,10 @@ def validateCommits() {
 }
 
 def calculateSemanticVersion() {
-    // 1. Đọc phiên bản hiện tại từ file VERSION trong repo (ví dụ: 1.0.0)
-    def versionFile = "VERSION"
-    def currentVersion = readFile(versionFile).trim()
-    def (major, minor, patch) = currentVersion.tokenize('.').collect { it.toInteger() }
-
+    def currentTag = getLatestTag()
+    // Xử lý nếu tag có tiền tố 'v' (ví dụ: v1.2.0)
+    def cleanTag = currentTag.startsWith('v') ? currentTag.substring(1) : currentTag
+    def (major, minor, patch) = cleanTag.tokenize('.').collect { it.toInteger() }
     // 2. Phân tích các commit trong Repo Code
     def changeLogSets = currentBuild.changeSets
     def isMinor = false
@@ -80,7 +88,12 @@ pipeline {
     stages {
         stage('Checkout & Build') {
             steps {
-                git branch: 'main', credentialsId: "${GIT_CREDS_ID}", url: "${GITLAB_REPO_CODE_URL}"
+                // Checkout code và đảm bảo fetch đủ tags
+                checkout([$class: 'GitSCM', 
+                    branches: [[name: 'main']], 
+                    extensions: [[$class: 'CloneOption', noTags: false, shallow: false]], 
+                    userRemoteConfigs: [[url: "${GITLAB_REPO_CODE_URL}", credentialsId: "${GIT_CREDS_ID}"]]
+                ])
                 script { 
                     // Chạy hàm kiểm tra
                     validateCommits()
@@ -92,7 +105,7 @@ pipeline {
 
                     env.ON_PREM_TAG = "${semVer}-build.${buildNum}" // Dùng cho Harbor: 1.2.0-build.45
                     env.CLOUD_TAG   = "${semVer}"             // Dùng cho GKE: 1.2.0
-                    
+                    echo "🚀 Version: On-Premise (${env.ON_PREM_TAG}) | Cloud (${env.CLOUD_TAG})"
                     // Bọc parallel để build song song
                     parallel(
                         "Build Backend": {
@@ -263,7 +276,7 @@ pipeline {
                                 git config user.email "jenkins@bot.com" 
                                 git config user.name "Jenkins Bot"
                                 git add CHANGELOG.md
-                                git commit -m 'docs: Update CHANGELOG.md for Build ${env.BUILD_NUMBER}' || echo "No changes" 
+                                git commit -m 'docs: Update CHANGELOG.md for TAG ${CLOUD_TAG}' || echo "No changes" 
                                 git push https://${GIT_USER}:${GIT_TOKEN}@${GITLAB_REPO_MANIFEST_URL.replace('https://', '')} HEAD:main 
                             """
                         }
@@ -297,9 +310,16 @@ pipeline {
                             sh "kustomize edit set image ecommerce-fe=${REGISTRY_URL}/${FE_IMAGE_NAME}:${CLOUD_TAG}"
                         }
                     }
-                    
+
                     // 3. Push Git Manifest (SỬ DỤNG LẠI PAT ĐỂ PUSH)
                     withCredentials([usernamePassword(credentialsId: "${GIT_CREDS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+                        // 1. Tag Repo CODE (Quan trọng nhất để tăng version cho lần sau)
+                        dir('code-repo') { 
+                            sh """
+                                git tag -a v${CLOUD_TAG} -m "Release v${CLOUD_TAG} approved by ${env.APPROVER}"
+                                git push https://${GIT_USER}:${GIT_TOKEN}@${GITLAB_REPO_CODE_URL.replace('https://', '')} --tags
+                            """
+                        }
                         dir('manifest-repo') {
                             sh """
                                 git config user.email "jenkins@bot.com"
@@ -308,7 +328,8 @@ pipeline {
                                 
                                 git add ecommerce/overlays/cloud/
                                 git commit -m 'GitOps: Deploy to GKE - Build ${CLOUD_TAG}' || echo "No changes to commit"
-                                
+                                git tag -a v${CLOUD_TAG} -m "Release ${CLOUD_TAG}"
+
                                 # QUAN TRỌNG: Gán Token vào URL để Push qua HTTPS
                                 # URL mẫu: https://user:token@git.codebyluke.io.vn/hybrid-cloud/manifest.git
                                 git push https://${GIT_USER}:${GIT_TOKEN}@${GITLAB_REPO_MANIFEST_URL.replace('http://', '').replace('https://', '')} HEAD:main
@@ -326,7 +347,7 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: "${GIT_CREDS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) { 
                         dir('manifest-repo') {
                             def tagName = "v${CLOUD_TAG}" // Bạn có thể tùy biến format tag 
-                            def tagMessage = "Release Build #${CLOUD_TAG} - Approved by ${env.APPROVER}"
+                            def tagMessage = "Release Build ${CLOUD_TAG} - Approved by ${env.APPROVER}"
 
                             sh """
                                 git config user.email "jenkins@bot.com"
